@@ -3,29 +3,23 @@ name: Docker CI/CD for Mercado Livre Script
 on:
   push:
     branches:
-      - main # O workflow será acionado em cada push para a branch 'main'
-  workflow_dispatch: # Permite acionar o workflow manualmente pela UI do GitHub
+      - main
+  workflow_dispatch:
   schedule:
-    # Executa todos os dias à 01:00 AM UTC
-    # Para ajustar o fuso horário, você pode converter para UTC ou usar um runner auto-hospedado
-    # com o fuso horário configurado.
-    # Exemplo: Para 01:00 AM em São Paulo (UTC-3), seria 04:00 AM UTC:
-    # - cron: '0 4 * * *'
-    - cron: '0 1 * * *' # Minuto Hora Dia_do_Mes Mes Dia_da_Semana
+    - cron: '0 1 * * *'
 
 env:
-  DOCKER_IMAGE_NAME: ml-product-sync # Nome da sua imagem Docker
-  DOCKER_REGISTRY: ghcr.io/${{ github.repository_owner }} # Usando GitHub Container Registry (GHCR)
+  DOCKER_IMAGE_NAME: ml-product-sync
+  DOCKER_REGISTRY: ghcr.io/${{ github.repository_owner }}
 
 jobs:
   build_and_push:
-    runs-on: ubuntu-latest # O runner que executará as ações
+    runs-on: ubuntu-latest
 
     permissions:
       contents: read
-      packages: write # Permissão necessária para push para GHCR
+      packages: write
 
-    # Definindo as variáveis de ambiente para este job, lendo dos GitHub Secrets
     env:
       CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
@@ -38,21 +32,19 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4 # Clona seu repositório
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
-        # Configura um builder multi-plataforma.
-        # Isso é crucial para construir imagens compatíveis com diferentes arquiteturas (ex: ARM64).
         with:
-          platforms: linux/amd64,linux/arm64 # Adiciona as plataformas que você deseja suportar
+          platforms: linux/amd64,linux/arm64
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }} # Token automático fornecido pelo GitHub
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract Docker metadata
         id: meta
@@ -67,14 +59,12 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: . # O diretório onde o Dockerfile está (raiz do repositório)
-          push: true # Faz o push da imagem para o registry
-          tags: ${{ steps.meta.outputs.tags }} # Usa as tags geradas pelo metadata-action
-          labels: ${{ steps.meta.outputs.labels }} # Usa os labels gerados pelo metadata-action
-          # Cache para builds mais rápidos
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-          # Adiciona a lista de plataformas para as quais a imagem será construída
           platforms: linux/amd64,linux/arm64
 
       - name: Verify pushed image (optional)
@@ -82,7 +72,6 @@ jobs:
           echo "Imagem Docker construída e enviada com sucesso para:"
           echo "${{ steps.meta.outputs.tags }}"
 
-  # Job para executar o script Dockerizado em um agendamento (inalterado)
   run_scheduled_script:
     runs-on: ubuntu-latest
     needs: build_and_push
