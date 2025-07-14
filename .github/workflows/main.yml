@@ -1,0 +1,57 @@
+name: Docker CI/CD for Mercado Livre Script
+
+on:
+  push:
+    branches:
+      - main # O workflow será acionado em cada push para a branch 'main'
+  workflow_dispatch: # Permite acionar o workflow manualmente pela UI do GitHub
+
+env:
+  DOCKER_IMAGE_NAME: ml-product-sync # Nome da sua imagem Docker
+  DOCKER_REGISTRY: ghcr.io/${{ github.repository_owner }} # Usando GitHub Container Registry (GHCR)
+
+jobs:
+  build_and_push:
+    runs-on: ubuntu-latest # O runner que executará as ações
+
+    permissions:
+      contents: read
+      packages: write # Permissão necessária para push para GHCR
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4 # Clona seu repositório
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }} # Token automático fornecido pelo GitHub
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest
+            type=sha,format=short
+            type=ref,event=branch
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: . # O diretório onde o Dockerfile está (raiz do repositório)
+          push: true # Faz o push da imagem para o registry
+          tags: ${{ steps.meta.outputs.tags }} # Usa as tags geradas pelo metadata-action
+          labels: ${{ steps.meta.outputs.labels }} # Usa os labels gerados pelo metadata-action
+          # Cache para builds mais rápidos
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify pushed image (optional)
+        run: |
+          echo "Imagem Docker construída e enviada com sucesso para:"
+          echo "${{ steps.meta.outputs.tags }}"
+
