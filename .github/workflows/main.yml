@@ -18,9 +18,27 @@ jobs:
       contents: read
       packages: write # Permissão necessária para push para GHCR
 
+    # Definindo as variáveis de ambiente para este job, lendo dos GitHub Secrets
+    # Estas variáveis são principalmente para o tempo de execução do contêiner Docker,
+    # mas são listadas aqui para demonstrar como os segredos são acessados no workflow.
+    env:
+      CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
+      CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
+      REFRESH_TOKEN: ${{ secrets.ML_REFRESH_TOKEN }}
+      SELLER_ID: ${{ secrets.ML_SELLER_ID }}
+      DB_HOST: ${{ secrets.DB_HOST }}
+      DB_USER: ${{ secrets.DB_USER }}
+      DB_PASS: ${{ secrets.DB_PASS }}
+      DB_NAME: ${{ secrets.DB_NAME }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4 # Clona seu repositório
+
+      # Passo adicionado: Configura o Buildx para usar o driver 'docker-container'
+      # Este driver suporta o cache de ações do GitHub (type=gha)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -54,4 +72,12 @@ jobs:
         run: |
           echo "Imagem Docker construída e enviada com sucesso para:"
           echo "${{ steps.meta.outputs.tags }}"
+
+# Para tornar a imagem Docker pública no GitHub Container Registry (GHCR) para pull sem autenticação:
+# 1. Certifique-se de que o repositório GitHub (onde este workflow está) é PÚBLICO.
+# 2. Após a primeira execução bem-sucedida deste workflow que envia a imagem para o GHCR,
+#    vá para a aba 'Packages' (Pacotes) no seu perfil ou organização no GitHub.
+# 3. Encontre o pacote da sua imagem (ml-product-sync).
+# 4. Nas configurações do pacote, altere a visibilidade de 'Private' (Privado) para 'Public' (Público).
+#    Uma vez feito isso, qualquer pessoa poderá puxar a imagem sem autenticação.
 
