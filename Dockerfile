@@ -54,4 +54,3 @@ CMD if [ -n "$CRON_SCHEDULE" ]; then \
         /app/mercadolibre_script.sh; \
     fi
 
-
