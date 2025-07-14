@@ -81,3 +81,4 @@ jobs:
 # 4. Nas configurações do pacote, altere a visibilidade de 'Private' (Privado) para 'Public' (Público).
 #    Uma vez feito isso, qualquer pessoa poderá puxar a imagem sem autenticação.
 
+
