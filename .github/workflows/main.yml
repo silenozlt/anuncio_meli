@@ -5,6 +5,13 @@ on:
     branches:
       - main # O workflow será acionado em cada push para a branch 'main'
   workflow_dispatch: # Permite acionar o workflow manualmente pela UI do GitHub
+  schedule:
+    # Executa todos os dias à 01:00 AM UTC
+    # Para ajustar o fuso horário, você pode converter para UTC ou usar um runner auto-hospedado
+    # com o fuso horário configurado.
+    # Exemplo: Para 01:00 AM em São Paulo (UTC-3), seria 04:00 AM UTC:
+    # - cron: '0 4 * * *'
+    - cron: '0 1 * * *' # Minuto Hora Dia_do_Mes Mes Dia_da_Semana
 
 env:
   DOCKER_IMAGE_NAME: ml-product-sync # Nome da sua imagem Docker
@@ -19,8 +26,6 @@ jobs:
       packages: write # Permissão necessária para push para GHCR
 
     # Definindo as variáveis de ambiente para este job, lendo dos GitHub Secrets
-    # Estas variáveis são principalmente para o tempo de execução do contêiner Docker,
-    # mas são listadas aqui para demonstrar como os segredos são acessados no workflow.
     env:
       CLIENT_ID: ${{ secrets.ML_CLIENT_ID }}
       CLIENT_SECRET: ${{ secrets.ML_CLIENT_SECRET }}
@@ -35,10 +40,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4 # Clona seu repositório
 
-      # Passo adicionado: Configura o Buildx para usar o driver 'docker-container'
-      # Este driver suporta o cache de ações do GitHub (type=gha)
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+        # Configura um builder multi-plataforma.
+        # Isso é crucial para construir imagens compatíveis com diferentes arquiteturas (ex: ARM64).
+        with:
+          platforms: linux/amd64,linux/arm64 # Adiciona as plataformas que você deseja suportar
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -67,18 +74,43 @@ jobs:
           # Cache para builds mais rápidos
           cache-from: type=gha
           cache-to: type=gha,mode=max
+          # Adiciona a lista de plataformas para as quais a imagem será construída
+          platforms: linux/amd64,linux/arm64
 
       - name: Verify pushed image (optional)
         run: |
           echo "Imagem Docker construída e enviada com sucesso para:"
           echo "${{ steps.meta.outputs.tags }}"
 
-# Para tornar a imagem Docker pública no GitHub Container Registry (GHCR) para pull sem autenticação:
-# 1. Certifique-se de que o repositório GitHub (onde este workflow está) é PÚBLICO.
-# 2. Após a primeira execução bem-sucedida deste workflow que envia a imagem para o GHCR,
-#    vá para a aba 'Packages' (Pacotes) no seu perfil ou organização no GitHub.
-# 3. Encontre o pacote da sua imagem (ml-product-sync).
-# 4. Nas configurações do pacote, altere a visibilidade de 'Private' (Privado) para 'Public' (Público).
-#    Uma vez feito isso, qualquer pessoa poderá puxar a imagem sem autenticação.
+  # Job para executar o script Dockerizado em um agendamento (inalterado)
+  run_scheduled_script:
+    runs-on: ubuntu-latest
+    needs: build_and_push
+    if: github.event_name == 'schedule'
 
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run Dockerized Script
+        run: |
+          docker pull ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+          docker run --rm \
+            -e CLIENT_ID="${{ secrets.ML_CLIENT_ID }}" \
+            -e CLIENT_SECRET="${{ secrets.ML_CLIENT_SECRET }}" \
+            -e REFRESH_TOKEN="${{ secrets.ML_REFRESH_TOKEN }}" \
+            -e SELLER_ID="${{ secrets.ML_SELLER_ID }}" \
+            -e DB_HOST="${{ secrets.DB_HOST }}" \
+            -e DB_USER="${{ secrets.DB_USER }}" \
+            -e DB_PASS="${{ secrets.DB_PASS }}" \
+            -e DB_NAME="${{ secrets.DB_NAME }}" \
+            ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE_NAME }}:latest
 
