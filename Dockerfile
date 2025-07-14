@@ -1,16 +1,19 @@
-# Usa uma imagem base leve do Debian, que é boa para scripts Bash
+# Uses a lightweight Debian base image, which is good for Bash scripts
 FROM debian:stable-slim
 
-# Define variáveis de ambiente para evitar avisos de localização e para o cron
-ENV DEBIAN_FRONTEND=noninteractive
-ENV TZ=America/Sao_Paulo # Defina seu fuso horário aqui, ex: America/Sao_Paulo, America/New_York, Europe/London
+# Explicitly set the shell for RUN commands to ensure consistent behavior
+SHELL ["/bin/bash", "-c"]
 
-# Instala as dependências necessárias:
-# curl: para fazer requisições HTTP
-# jq: para parsear JSON
-# default-mysql-client: para interagir com o MySQL
-# cron: para agendamento de tarefas
-# procps: para o comando 'ps' usado em alguns scripts de inicialização
+# Defines environment variables to avoid localization warnings and for cron
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=America/Sao_Paulo # Define your timezone here, e.g.: America/Sao_Paulo, America/New_York, Europe/London
+
+# Installs necessary dependencies:
+# curl: for making HTTP requests
+# jq: for parsing JSON
+# default-mysql-client: for interacting with MySQL
+# cron: for task scheduling
+# procps: for the 'ps' command used in some startup scripts
 RUN apt-get update && apt-get install -y \
     curl \
     jq \
@@ -20,34 +23,34 @@ RUN apt-get update && apt-get install -y \
     --no-install-recommends && \
     rm -rf /var/lib/apt/lists/*
 
-# Cria um diretório de trabalho dentro do contêiner
+# Creates a working directory inside the container
 WORKDIR /app
 
-# Copia o script Bash para o diretório de trabalho
+# Copies the Bash script to the working directory
 COPY mercadolibre_script.sh /app/mercadolibre_script.sh
 
-# Dá permissão de execução ao script
+# Grants execution permission to the script
 RUN chmod +x /app/mercadolibre_script.sh
 
-# Cria um arquivo de log para o cron e dá permissões
+# Creates a log file for cron and grants permissions
 RUN touch /var/log/cron.log && chmod 644 /var/log/cron.log
 
-# Opcional: Cria um arquivo de persistência para o refresh token
-# Este arquivo será usado pelo script Bash para salvar o refresh token
+# Optional: Creates a persistence file for the refresh token
+# This file will be used by the Bash script to save the refresh token
 RUN touch /app/.ml_refresh_token && chmod 600 /app/.ml_refresh_token
 
-# Expõe uma porta se o script tivesse um serviço web, mas para este script, não é necessário.
+# Exposes a port if the script had a web service, but for this script, it's not necessary.
 # EXPOSE 8080
 
-# Comando de inicialização do contêiner
-# Se a variável de ambiente CRON_SCHEDULE for definida, configura o cron.
-# Caso contrário, executa o script uma única vez.
+# Container startup command
+# If the CRON_SCHEDULE environment variable is defined, it configures cron.
+# Otherwise, it runs the script once.
 CMD if [ -n "$CRON_SCHEDULE" ]; then \
         echo "$CRON_SCHEDULE /app/mercadolibre_script.sh >> /var/log/cron.log 2>&1" | crontab -; \
-        echo "Cron job configurado: $CRON_SCHEDULE /app/mercadolibre_script.sh"; \
+        echo "Cron job configured: $CRON_SCHEDULE /app/mercadolibre_script.sh"; \
         cron -f; \
     else \
-        echo "CRON_SCHEDULE não definido. Executando o script uma vez..."; \
+        echo "CRON_SCHEDULE not defined. Running the script once..."; \
         /app/mercadolibre_script.sh; \
     fi
 
