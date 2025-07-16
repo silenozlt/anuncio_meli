@@ -478,5 +478,3 @@ echo ""
 echo -e "${GREEN}✅ Processo concluído com search_type=scan unificado! Dados atualizados no MySQL na tabela '$DB_TABLE'.${NC}"
 echo -e "${BLUE}ℹ️ Esta abordagem coleta todos os produtos que a API retorna, independente do status${NC}"
 
-
-
