@@ -22,7 +22,7 @@ DB_HOST="${DB_HOST}"
 DB_USER="${DB_USER}"
 DB_PASS="${DB_PASS}"
 DB_NAME="${DB_NAME}"
-DB_TABLE="produtos_meli" # Mantido fixo ou pode ser variável de ambiente também
+DB_TABLE="produtos_ml" # Mantido fixo ou pode ser variável de ambiente também
 
 # --- Cores ---
 GREEN='\033[0;32m'
